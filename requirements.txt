@@ -1,0 +1,15 @@
+# Backend & API
+fastapi==0.102.0
+uvicorn[standard]==0.23.1
+pydantic==2.5.1
+
+# Transformers & LLM
+torch==2.7.1
+transformers==4.41.0
+
+# JSON / parsing
+orjson==3.9.6
+
+# Développement / utilitaires
+python-dotenv==1.0.0
+loguru==0.7.2
