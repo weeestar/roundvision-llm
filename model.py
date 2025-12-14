@@ -1,30 +1,132 @@
-import onnxruntime_genai as rt
+import json
+import os
+from typing import Dict, List
 
-# Charger une seule fois au module
-MODEL_PATH = "/home/leonardo/llm-models/mistral-onnx-int4"
-model = rt.Model(MODEL_PATH)
-tokenizer = rt.Tokenizer(model)
+import torch
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    GenerationConfig,
+)
+
+from schemas import LLMResponse
+
+# ==========================
+# Config modèle
+# ==========================
+
+MODEL_NAME = os.path.expanduser("~/llm-models/llm-models/Mistral-7B-Instruct-v0.3")
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+# ==========================
+# Chargement tokenizer
+# ==========================
+
+tokenizer = AutoTokenizer.from_pretrained(
+    MODEL_NAME,
+    use_fast=True,
+)
+
+# ==========================
+# Chargement modèle 4-bit
+# ==========================
+
+model = AutoModelForCausalLM.from_pretrained(
+    MODEL_NAME,
+    device_map="auto",
+    load_in_4bit=True,  # 💥 clé magique
+    torch_dtype=torch.float16,
+)
+
+model.eval()
+
+# ==========================
+# Config génération
+# ==========================
+
+gen_config = GenerationConfig(
+    max_new_tokens=256,
+    temperature=0.7,
+    top_p=0.9,
+    do_sample=True,
+    eos_token_id=tokenizer.eos_token_id,
+)
+
+# ==========================
+# Fonction principale
+# ==========================
 
 
-def generate_response(messages):
-    prompt = ""
-    for msg in messages:
-        role = msg["role"]
-        content = msg["content"]
-        prompt += f"[{role.upper()}]: {content}\n"
+def generate_response(messages: List[Dict[str, str]]) -> LLMResponse:
+    """
+    Appelle Mistral 7B Instruct 4-bit
+    """
 
-    input_ids = tokenizer.encode(prompt)
+    prompt = build_prompt(messages)
 
-    params = rt.GeneratorParams(model)
-    params.set_model_input("input_ids", input_ids)
-    params.set_search_options(temperature=0.7, top_p=0.9)
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt",
+    ).to(DEVICE)
 
-    generator = rt.Generator(model, params)
+    with torch.no_grad():
+        outputs = model.generate(
+            **inputs,
+            generation_config=gen_config,
+        )
 
-    while not generator.is_done():
-        generator.generate_next_token()
-
-    output_tokens = generator.get_output("output_ids")
-    text = tokenizer.decode(output_tokens)
+    text = tokenizer.decode(
+        outputs[0],
+        skip_special_tokens=True,
+    )
 
     return try_parse_json(text)
+
+
+# ==========================
+# Prompt builder
+# ==========================
+
+
+def build_prompt(messages: List[Dict[str, str]]) -> str:
+    """
+    Format Instruct Mistral
+    """
+
+    prompt = "<s>"
+    for msg in messages:
+        if msg["role"] == "system":
+            prompt += f"[INST] {msg['content']} [/INST]\n"
+        elif msg["role"] == "user":
+            prompt += f"[INST] {msg['content']} [/INST]\n"
+        elif msg["role"] == "assistant":
+            prompt += f"{msg['content']}\n"
+
+    return prompt
+
+
+# ==========================
+# JSON parsing / fallback
+# ==========================
+
+
+def try_parse_json(text: str) -> LLMResponse:
+    try:
+        start = text.index("{")
+        end = text.rindex("}") + 1
+        data = json.loads(text[start:end])
+
+        return LLMResponse(
+            reply=data.get("reply", "…"),
+            intent=data.get("intent", "unknown"),
+            extracted_data=data.get("extracted_data", {}),
+            confidence=float(data.get("confidence", 0.5)),
+        )
+
+    except Exception:
+        return LLMResponse(
+            reply=text.strip(),
+            intent="unknown",
+            extracted_data={},
+            confidence=0.5,
+        )
