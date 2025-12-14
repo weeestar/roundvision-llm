@@ -17,7 +17,8 @@ from schemas import LLMResponse
 # ==========================
 
 MODEL_NAME = os.path.expanduser("~/llm-models/Mistral-7B-Instruct-v0.3")
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+# DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+DEVICE = "cuda"
 
 bnb_config = BitsAndBytesConfig(
     load_in_4bit=True,
