@@ -45,6 +45,7 @@ model = AutoModelForCausalLM.from_pretrained(
     quantization_config=bnb_config,
     torch_dtype=torch.float16,
     trust_remote_code=True,
+    device_map={"": "cuda:0"},
 )
 
 model.eval()
