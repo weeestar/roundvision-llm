@@ -13,7 +13,8 @@ from schemas import LLMResponse
 # ==========================
 
 MODEL_PATH = os.path.expanduser("~/llm-models/mistral-onnx-int4/model.onnx")
-tokenizer = AutoTokenizer.from_pretrained("./mistral-onnx-int4")
+TOKENIZER_PATH = os.path.expanduser("~/llm-models/mistral-onnx-int4")
+tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
 
 # Session ONNX
 session = ort.InferenceSession(MODEL_PATH, providers=["CUDAExecutionProvider"])
