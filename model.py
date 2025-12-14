@@ -14,7 +14,11 @@ from schemas import LLMResponse
 
 MODEL_PATH = os.path.expanduser("~/llm-models/mistral‑onnx‑int4/model.onnx")
 TOKENIZER_PATH = os.path.expanduser("~/llm-models/mistral‑onnx‑int4")
-tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_PATH)
+tokenizer = AutoTokenizer.from_pretrained(
+    TOKENIZER_PATH,
+    use_fast=True,
+    trust_remote_code=True,  # permet d'utiliser le tokenizer custom NVIDIA si nécessaire
+)
 
 # Session ONNX
 session = ort.InferenceSession(MODEL_PATH, providers=["CUDAExecutionProvider"])
