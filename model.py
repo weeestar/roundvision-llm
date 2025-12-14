@@ -4,7 +4,7 @@ from typing import Dict, List
 
 import numpy as np
 import onnxruntime as ort
-from transformers import AutoTokenizer
+from transformers import PreTrainedTokenizerFast
 
 from schemas import LLMResponse
 
@@ -12,13 +12,10 @@ from schemas import LLMResponse
 # Config modèle ONNX
 # ==========================
 
-TOKENIZER_PATH = os.path.expanduser("~/llm-models/mistral-onnx-int4")
-MODEL_PATH = os.path.join(TOKENIZER_PATH, "model.onnx")
-tokenizer = AutoTokenizer.from_pretrained(
-    TOKENIZER_PATH,
-    use_fast=True,
-    trust_remote_code=True,  # permet d'utiliser le tokenizer custom NVIDIA si nécessaire
-)
+LLM_PATH = os.path.expanduser("~/llm-models/mistral-onnx-int4")
+MODEL_PATH = os.path.join(LLM_PATH, "model.onnx")
+TOKENIZER_PATH = os.path.join(LLM_PATH, "tokenizer.json")
+tokenizer = PreTrainedTokenizerFast(tokenizer_file=TOKENIZER_PATH)
 
 # Session ONNX
 session = ort.InferenceSession(MODEL_PATH, providers=["CUDAExecutionProvider"])
