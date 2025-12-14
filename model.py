@@ -2,37 +2,23 @@ import json
 import os
 from typing import Dict, List
 
-import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, GenerationConfig
+import numpy as np
+import onnxruntime as ort
+from transformers import AutoTokenizer
 
 from schemas import LLMResponse
 
 # ==========================
-# Config du modèle
+# Config modèle ONNX
 # ==========================
 
-MODEL_NAME = os.path.expanduser("~/llm-models/Mistral-7B-Instruct-v0.3")
-DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+MODEL_PATH = os.path.expanduser("~/llm-models/mistral-onnx-int4/model.onnx")
+tokenizer = AutoTokenizer.from_pretrained("./mistral-onnx-int4")
 
-# ==========================
-# Chargement du modèle
-# ==========================
-
-tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
-model = AutoModelForCausalLM.from_pretrained(
-    MODEL_NAME,
-    device_map="auto",  # répartit sur GPU automatiquement
-    dtype=torch.float16,  # économie mémoire
-).to(DEVICE)
-
-# Config de génération par défaut
-gen_config = GenerationConfig(
-    max_new_tokens=256,
-    temperature=0.7,
-    top_p=0.9,
-    do_sample=True,
-    eos_token_id=tokenizer.eos_token_id,
-)
+# Session ONNX
+session = ort.InferenceSession(MODEL_PATH, providers=["CUDAExecutionProvider"])
+input_name = session.get_inputs()[0].name
+output_name = session.get_outputs()[0].name
 
 # ==========================
 # Fonction principale
@@ -41,8 +27,7 @@ gen_config = GenerationConfig(
 
 def generate_response(messages: List[Dict[str, str]]) -> LLMResponse:
     """
-    Appelle le LLM avec une liste de messages construits par builder.py
-    et retourne un LLMResponse valide.
+    Appelle le modèle ONNX INT4 et retourne un LLMResponse valide.
     """
 
     # Concatène les messages dans un format type "chat"
@@ -58,21 +43,21 @@ def generate_response(messages: List[Dict[str, str]]) -> LLMResponse:
             prompt_text += f"[ASSISTANT]: {content}\n"
 
     # Tokenization
-    inputs = tokenizer(prompt_text, return_tensors="pt").to(DEVICE)
+    inputs = tokenizer(prompt_text, return_tensors="np")
+    input_ids = inputs["input_ids"].astype(np.int64)
 
-    # Génération
-    with torch.no_grad():
-        output_ids = model.generate(**inputs, **gen_config.__dict__)
+    # Génération avec ONNX
+    # ⚠️ Ici on fait une génération simple, pas de sampling ni top_p
+    outputs = session.run([output_name], {input_name: input_ids})
+    generated_ids = outputs[0][0]
 
     # Décodage
-    output_text = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+    output_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
 
     # ==========================
     # Extraire JSON depuis le texte généré
     # ==========================
-
     response_json = try_parse_json(output_text)
-
     return response_json
 
 
@@ -82,10 +67,6 @@ def generate_response(messages: List[Dict[str, str]]) -> LLMResponse:
 
 
 def try_parse_json(text: str) -> LLMResponse:
-    """
-    Essaie d'extraire un JSON strict depuis le texte généré.
-    Fallback simple si parse échoue.
-    """
     try:
         data = json.loads(text)
         return LLMResponse(
@@ -95,7 +76,6 @@ def try_parse_json(text: str) -> LLMResponse:
             confidence=float(data.get("confidence", 0.5)),
         )
     except json.JSONDecodeError:
-        # fallback : retourne le texte brut dans reply
         return LLMResponse(
             reply=text.strip(), intent="unknown", extracted_data={}, confidence=0.5
         )
