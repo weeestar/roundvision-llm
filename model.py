@@ -34,7 +34,7 @@ tokenizer = AutoTokenizer.from_pretrained(
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
     device_map="auto",
-    load_in_4bit=True,  # 💥 clé magique
+    load_in_4bit=True,
     torch_dtype=torch.float16,
 )
 
@@ -67,7 +67,7 @@ def generate_response(messages: List[Dict[str, str]]) -> LLMResponse:
     inputs = tokenizer(
         prompt,
         return_tensors="pt",
-    ).to(DEVICE)
+    )
 
     with torch.no_grad():
         outputs = model.generate(
