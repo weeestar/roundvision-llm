@@ -6,6 +6,7 @@ import torch
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
+    BitsAndBytesConfig,
     GenerationConfig,
 )
 
@@ -17,6 +18,13 @@ from schemas import LLMResponse
 
 MODEL_NAME = os.path.expanduser("~/llm-models/Mistral-7B-Instruct-v0.3")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+
+bnb_config = BitsAndBytesConfig(
+    load_in_4bit=True,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_use_double_quant=True,
+)
 
 # ==========================
 # Chargement tokenizer
@@ -34,8 +42,8 @@ tokenizer = AutoTokenizer.from_pretrained(
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
     device_map="auto",
-    load_in_4bit=True,
-    torch_dtype=torch.float16,
+    quantization_config=bnb_config,
+    trust_remote_code=True,
 )
 
 model.eval()
