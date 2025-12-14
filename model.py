@@ -1,4 +1,5 @@
 import json
+import os
 from typing import Dict, List
 
 import torch
@@ -10,7 +11,7 @@ from schemas import LLMResponse
 # Config du modèle
 # ==========================
 
-MODEL_NAME = "mistral-0.7b-instruct"  # changer selon ton modèle
+MODEL_NAME = os.path.expanduser("~/llm-models/Mistral-7B-Instruct-v0.3")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ==========================
