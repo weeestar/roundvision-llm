@@ -15,7 +15,7 @@ from schemas import LLMResponse
 # Config modèle
 # ==========================
 
-MODEL_NAME = os.path.expanduser("~/llm-models/llm-models/Mistral-7B-Instruct-v0.3")
+MODEL_NAME = os.path.expanduser("~/llm-models/Mistral-7B-Instruct-v0.3")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 # ==========================
