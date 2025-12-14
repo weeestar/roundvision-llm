@@ -76,7 +76,7 @@ def generate_response(messages: List[Dict[str, str]]) -> LLMResponse:
     inputs = tokenizer(
         prompt,
         return_tensors="pt",
-    )
+    ).to(DEVICE)
 
     with torch.no_grad():
         outputs = model.generate(
