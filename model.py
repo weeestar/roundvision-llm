@@ -12,8 +12,8 @@ from schemas import LLMResponse
 # Config modèle ONNX
 # ==========================
 
-MODEL_PATH = os.path.expanduser("~/llm-models/mistral‑onnx‑int4/model.onnx")
-TOKENIZER_PATH = os.path.expanduser("~/llm-models/mistral‑onnx‑int4")
+TOKENIZER_PATH = os.path.expanduser("~/llm-models/mistral-onnx-int4")
+MODEL_PATH = os.path.join(TOKENIZER_PATH, "model.onnx")
 tokenizer = AutoTokenizer.from_pretrained(
     TOKENIZER_PATH,
     use_fast=True,
