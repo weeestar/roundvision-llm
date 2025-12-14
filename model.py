@@ -1,38 +1,28 @@
-import json
 import os
 from typing import Dict, List
 
-import numpy as np
-import onnxruntime as ort
-from transformers import PreTrainedTokenizerFast
+from onnxruntime.transformers import GenerativeModel
 
 from schemas import LLMResponse
 
 # ==========================
-# Config modèle ONNX
+# Config modèle ONNX GenAI
 # ==========================
+MODEL_PATH = os.path.expanduser("~/llm-models/mistral-onnx-int4/model.onnx")
 
-LLM_PATH = os.path.expanduser("~/llm-models/mistral-onnx-int4")
-MODEL_PATH = os.path.join(LLM_PATH, "model.onnx")
-TOKENIZER_PATH = os.path.join(LLM_PATH, "tokenizer.json")
-tokenizer = PreTrainedTokenizerFast(tokenizer_file=TOKENIZER_PATH)
+# Initialisation du modèle avec ONNX Runtime GenAI
+gen_model = GenerativeModel(MODEL_PATH)
 
-# Session ONNX
-session = ort.InferenceSession(MODEL_PATH, providers=["CUDAExecutionProvider"])
-input_name = session.get_inputs()[0].name
-output_name = session.get_outputs()[0].name
 
 # ==========================
 # Fonction principale
 # ==========================
-
-
 def generate_response(messages: List[Dict[str, str]]) -> LLMResponse:
     """
-    Appelle le modèle ONNX INT4 et retourne un LLMResponse valide.
+    Génère une réponse à partir d'une liste de messages de type chat.
     """
 
-    # Concatène les messages dans un format type "chat"
+    # Concatène les messages dans un format "chat"
     prompt_text = ""
     for msg in messages:
         role = msg["role"]
@@ -44,28 +34,37 @@ def generate_response(messages: List[Dict[str, str]]) -> LLMResponse:
         elif role == "assistant":
             prompt_text += f"[ASSISTANT]: {content}\n"
 
-    # Tokenization
-    inputs = tokenizer(prompt_text, return_tensors="np")
-    input_ids = inputs["input_ids"].astype(np.int64)
+    try:
+        # Génération de texte avec le modèle GenAI
+        output = gen_model.generate(
+            prompt_text,
+            max_length=512,  # tu peux ajuster selon tes besoins
+            do_sample=True,
+            temperature=0.7,
+            top_p=0.9,
+        )
 
-    # Génération avec ONNX
-    # ⚠️ Ici on fait une génération simple, pas de sampling ni top_p
-    outputs = session.run([output_name], {input_name: input_ids})
-    generated_ids = outputs[0][0]
+        # Récupère le texte généré
+        output_text = output[0]  # output est une liste
 
-    # Décodage
-    output_text = tokenizer.decode(generated_ids, skip_special_tokens=True)
+        # Essaie d'extraire un JSON depuis le texte
+        response_json = try_parse_json(output_text)
+        return response_json
 
-    # ==========================
-    # Extraire JSON depuis le texte généré
-    # ==========================
-    response_json = try_parse_json(output_text)
-    return response_json
+    except Exception as e:
+        # fallback en cas d'erreur
+        return LLMResponse(
+            reply="LLM processing error",
+            intent="unknown",
+            extracted_data={},
+            confidence=0.0,
+        )
 
 
 # ==========================
 # JSON parsing / fallback
 # ==========================
+import json
 
 
 def try_parse_json(text: str) -> LLMResponse:
@@ -79,5 +78,8 @@ def try_parse_json(text: str) -> LLMResponse:
         )
     except json.JSONDecodeError:
         return LLMResponse(
-            reply=text.strip(), intent="unknown", extracted_data={}, confidence=0.5
+            reply=text.strip(),
+            intent="unknown",
+            extracted_data={},
+            confidence=0.5,
         )
